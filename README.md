@@ -47,3 +47,21 @@
 # 无参数运行时，程序会提示输入文件路径
 ./wfreq
 ```
+
+
+# W4-DEMO
+
+**第四周**，运用 C++ 内存管理、多态、原子操作、模板及 RAII 等特性，手写实现了一套智能指针组件 `MySharedPtr` 和 `MyWeakPtr`，完整模拟了 `std::shared_ptr` / `std::weak_ptr` 的核心行为。
+
+主要实现了：
+
+- **控制块体系**：设计 `CtrlBlockBase` 抽象基类，派生出 `HeapCtrlBlock`（裸指针构造）和 `MakeSharedCtrlBlock`（对象嵌入控制块，单次内存分配），统一管理强/弱引用计数。
+- **引用计数**：使用 `std::atomic<long>` 保证线程安全的强引用计数（`strong_cnt`）和弱引用计数（`weak_cnt`），实现自动资源释放。
+- **构造方式**：支持从裸指针构造（采用默认删除器 `std::default_delete`）、拷贝构造、移动构造，以及静态工厂 `make_shared` 完美转发参数，减少内存碎片。
+- **赋值与交换**：拷贝赋值使用 copy-and-swap 惯用法，提供 `swap` 友元函数，保证异常安全；移动赋值转移所有权。
+- **资源管理**：析构时递减强引用，计数归零则调用 `dispose` 销毁对象；若弱计数也为零则销毁控制块。`reset` 可主动释放资源。
+- **弱指针支持**：`MyWeakPtr` 可从 `MySharedPtr` 构造，支持 `expired` 检测和 `lock` 提升为 `MySharedPtr`，使用 CAS 循环安全地增加强引用计数，避免竞态。
+- **RAII 与访问**：提供 `get`、`operator->`、`operator*`、`explicit operator bool` 等接口，`use_count` 返回当前强引用数。
+- **循环引用处理**：通过 `MyWeakPtr` 打破循环引用（如链表节点中 `weak_next` 指向上一节点），测试用例验证了 `a->next = b; b->weak_next = a;` 后资源能正确释放。
+
+附带的测试程序 `main.cpp` 覆盖了上述所有功能，包括基本构造、拷贝/移动、赋值、`make_shared`、`reset/swap`、弱指针锁定以及循环引用场景，确保智能指针行为与标准库一致。
